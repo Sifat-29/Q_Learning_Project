@@ -16,7 +16,7 @@ class TictactoeQLearning(QLearningAI):
                       [(0,0),(1,1),(2,2)], [(0,2),(1,1),(2,0)]]
         self.reward_parameters = ["win", "loss", "draw", "move cost", "center occupancy", "corner occupancy", "created 2 in row", "blocked 2 in row", "suicide created", "suicide move"]
         if rewards is None:
-            rewards = [1.0, -1.0, -0.16536050827887683, -0.060851765544286104, 0.02, 0.01, 0.06930998784601186, 0.03596896892645857, 0.1, -0.2]
+            rewards = [1.0, -0.8, 0.15, 0, 0.05, 0.085, 0.2, 0.02, 0.3, -0.9]
 
         self.rewards = dict(zip(self.reward_parameters, rewards))
 
@@ -79,8 +79,8 @@ class TictactoeQLearning(QLearningAI):
         opp_token = "X" if token == "O" else "O"
         own_twos = opp_twos = 0
 
-        for coords in lines:
-            pieces = [board[r][c] for r, c in coords]
+        for cords in lines:
+            pieces = [board[r][c] for r, c in cords]
             if pieces.count(token) == 2 and pieces.count(" ") == 1:
                 own_twos += 1
             if pieces.count(opp_token) == 2 and pieces.count(" ") == 1:
@@ -145,4 +145,4 @@ class TictactoeQLearning(QLearningAI):
         return tuple(tuple(x) for x in c_board_copy), new_move, tuple(tuple(x) for x in n_board_copy)
 
     def get_cache_size(self):
-        return 10000
+        return 12000

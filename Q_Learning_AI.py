@@ -1,6 +1,5 @@
 from abc import ABC,abstractmethod
 import random
-import copy
 import pickle
 
 DEFAULT_NAME = "Oratrice Mecanique d'Analyse Cardinale"
@@ -20,10 +19,8 @@ class QLearningAI(ABC):
             else:
                 with open(rf"{pretrained_q_memory_path}", "rb") as f:
                     self.memory = pickle.load(f)
-            
+
         self.name = name
-        self.unique_counter = 0
-        self.nonunique_counter = 0
         self.random = random_behaviour
         self.random_moves = 0
         self.nonrandom_moves = 0
@@ -36,59 +33,46 @@ class QLearningAI(ABC):
     def is_ai_random(self):
         return self.random
 
+    def select_move(self, board, token, epsilon):
+        """
+        ε‑greedy + true random tie‑break.
 
-    def make_move_greedy(self, board):
+        - With probability ε, pick a random available move.
+        - Otherwise, compute Q for each move and pick uniformly among the best (or worst) Q-value.
         """
-        returns the best possible move
-        """
-        if self.random:
-            return self.make_move_random(board)
+        if self.random or random.uniform(0,1) < epsilon:
+            self.random_moves += 1
+            return random.choice(self.get_moves(board))
 
         all_moves = [(move, self.state_action_value(board, move)) for move in self.get_moves(board)]
-        m = max(all_moves, key=lambda x: x[1])
+        if token == "X":
+            m = max(all_moves, key=lambda x: x[1])
+        else:
+            m = min(all_moves, key=lambda x: x[1])
         self.nonrandom_moves += 1
 
-        if m[1] == 0:
-            # print(f"Unique, {m[1]}")
-            self.unique_counter += 1
+        if m[1] == 0.0:
             return random.choice(all_moves)[0]
-        # print(f"NonUnique, {m[1]}")
-        self.nonunique_counter += 1
         return m[0]
 
-    def state_action_value(self, board, action):
+
+
+    def state_action_value(self, board: list|tuple, action: tuple):
         """
         Return the Q-value for (board, action).
+        board is a 2d list
         Internally canonicalizes to the folded string key.
         """
         canonical_key, canonical_move, _ = self.get_canonical_key_move_nboard(board, action, board)
 
-        # 3) Default to 0.0 if unseen
-        return self.memory.get((canonical_key, canonical_move), 0.0)
+        return self.memory.get((canonical_key, canonical_move), 0)
 
 
-    def make_move_random(self, board):
-        """
-        returns a random move from all possible moves
-        """
-        move = random.choice(self.get_moves(board))
-
-        q = self.state_action_value(board, move)
-        if q == 0:
-            self.unique_counter += 1
-            # print(f"Unique, {q}")
-        else:
-            self.nonunique_counter += 1
-            # print(f"NonUnique, {q}")
-        self.random_moves += 1
-        return move
-
-
-    def update_memory(self, s, a, s_, r, alpha, gamma):
+    def update_memory(self, s, a, s_, r, alpha, gamma, token):
         key, move, next_board = self.get_canonical_key_move_nboard(s, a, s_)
 
         old_q = self.state_action_value(s, a)
-        future_q = self.max_state(next_board)
+        future_q = self.future_estimate(next_board, token)
         td_target = r + gamma * future_q
 
         self.memory[(key, move)] = old_q * (1 - alpha) + alpha * td_target
@@ -97,8 +81,6 @@ class QLearningAI(ABC):
     def get_canonical_key_move_nboard(self, c_board, move, n_board):
         if (c_board, move ,n_board) in self.cache:
             self.cache_hit += 1
-            # self.cache[(c_board, move, n_board)][1] += 1
-            # return self.cache[(c_board, move, n_board)][0]
             return self.cache[(c_board, move, n_board)]
 
         forms = self.get_canonical_forms(c_board, move, n_board)
@@ -119,21 +101,23 @@ class QLearningAI(ABC):
 
     def add_to_cache(self, prev_board, move, next_board, prev_board_key, new_move, new_next_board):
         self.cache_miss += 1
-        if len(self.cache) > self.CACHESIZE:
+        if len(self.cache) >= self.CACHESIZE:
             self.cache.clear()
-            # sorted_items = sorted(list(self.cache.items()), key=lambda x: x[1][1])
-            # retain_count = int(0.5 * len(sorted_items))
-            # self.cache = dict(sorted_items[-retain_count:])
 
-        # self.cache[(prev_board, move, next_board)] = [(prev_board_key, new_move, new_next_board), 1]
         self.cache[(prev_board, move, next_board)] = (prev_board_key, new_move, new_next_board)
 
 
-    def max_state(self, board):
+    def future_estimate(self, board, token):
         moves = self.get_moves(board)
         if not moves:
             return 0
-        return -max((self.state_action_value(board, move) for move in moves))
+
+        if token == "X":
+            return min((self.state_action_value(board, move) for move in moves))
+        elif token == "O":
+            return max((self.state_action_value(board, move) for move in moves))
+        else:
+            return 0
 
 
     def save_model(self, path=None):

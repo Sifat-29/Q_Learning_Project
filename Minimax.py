@@ -1,8 +1,14 @@
-class MinimaxTictactoe:
-    def __init__(self, name="Logos"):
-        self.name = name
+import random
 
-    def get_optimal_move(self, board, token):
+class MinimaxTictactoe:
+    def __init__(self, suboptimal=False, name="Logos"):
+        self.name = name
+        self.suboptimal = suboptimal
+
+    def get_optimal_move(self, board, token, epsilon=0.1):
+        if self.suboptimal and random.uniform(0, 1) < epsilon:
+            return random.choice(self.get_possible_moves(board))
+
         board_copy = [list(row) for row in board]
         move = self.minimax(board_copy, token, call="move")
         return move
@@ -17,7 +23,7 @@ class MinimaxTictactoe:
 
         other_player_token = "X" if player_token == "O" else "O"
 
-        possible_moves = [(i, j) for i in range(len(board)) for j in range(len(board[0])) if board[i][j] == " "]
+        possible_moves = self.get_possible_moves(board)
 
         best_value_move = None
         if player_token == "X":
@@ -78,5 +84,11 @@ class MinimaxTictactoe:
         new_board[move[0]][move[1]] = token
         return new_board
 
+    def get_possible_moves(self, board):
+        return [(i, j) for i in range(len(board)) for j in range(len(board[0])) if board[i][j] == " "]
+
     def __repr__(self):
-        return f"{self.name} (OPTIMAL AI)"
+        if self.suboptimal:
+            return f"{self.name} (SUBOPTIMAL AI)"
+        else:
+            return f"{self.name} (OPTIMAL AI)"

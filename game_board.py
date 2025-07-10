@@ -44,7 +44,7 @@ class GameBoard(ABC):
         pass
 
 
-    def start_game(self, mode = "play", test = False, epsilon = 0.1, alpha = 0.5, gamma = 0.9):
+    def start_game(self, mode="play", test=False, epsilon=0.1, alpha=0.2, gamma=0.9):
         """
         Plays the game based on the type of players (Independent of the game type)
         """
@@ -63,7 +63,7 @@ class GameBoard(ABC):
                     move = self.make_move(self.board, player, token)
                 else:
                     move = self.make_move(tuple((tuple(x) for x in self.board)), player, token)
-
+                self.place_token_on_board(self.board, token, move)
                 self.moves_played += 1
                 game_status, winning_token = self.is_game_over(self.board, move, check="special")
 
@@ -90,21 +90,18 @@ class GameBoard(ABC):
                 player, other_player, token, token_ = self.get_round_info()
                 current_board = tuple((tuple(row) for row in self.board))
 
-                # Make random move with probability epsilon
-                if random.random() < epsilon:
-                    epsilon_result = True
-                else:
-                    epsilon_result = False
-
                 # Board after move
-                move = self.make_move(current_board, player, token, epsilon_result=epsilon_result)
-
+                move = self.make_move(current_board, player, token, epsilon=epsilon)
+                self.place_token_on_board(self.board, token, move)
                 next_board = tuple((tuple(row) for row in self.board))
+
                 self.moves_played += 1
 
                 status, winning_token = self.is_game_over(next_board, move, check="board")
+
                 if isinstance(player, QLearningAI):
                     reward = player.get_reward_for_move(status, winning_token, token, current_board, move, next_board)
+                    reward = -reward if token == "O" else reward
 
                 if status == "won" and winning_token == token:
                     self.winner = player
@@ -115,7 +112,7 @@ class GameBoard(ABC):
 
                 if isinstance(player, QLearningAI):
                     if not player.is_ai_random():
-                        player.update_memory(current_board, tuple(move), next_board, reward, alpha, gamma)
+                        player.update_memory(current_board, tuple(move), next_board, reward, alpha, gamma, token)
 
 
     def get_round_info(self):
@@ -128,7 +125,7 @@ class GameBoard(ABC):
             return self.player2, self.player1, "O", "X"
 
 
-    def make_move(self, board, player, token, epsilon_result=False):
+    def make_move(self, board, player, token, epsilon=0):
         """
         Make the move for each game board after receiving the input move (move is different for each game)
         TicTacToe: move is (i, j) list/tuple
@@ -138,20 +135,17 @@ class GameBoard(ABC):
         TODO: Othello (P1), Chess (P2)
         """
         if isinstance(player, str):
-            move = self.get_move_from_player()
+            return self.get_move_from_player()
+
         elif isinstance(player, QLearningAI):
-            if epsilon_result:
-                move = list(player.make_move_random(board))
-            else:
-                move = list(player.make_move_greedy(board))
+            return list(player.select_move(board, token, epsilon))
+
         elif isinstance(player, MinimaxTictactoe):
-            move = player.get_optimal_move(board, token)
+            return player.get_optimal_move(board, token)
+
         else:
             print("Invalid player")
             return None
-
-        self.place_token_on_board(self.board, token, move)
-        return move
 
 
     @abstractmethod

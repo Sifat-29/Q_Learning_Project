@@ -15,7 +15,7 @@ class Connect4QLearning(QLearningAI):
             rewards = [1, -1, 0, 0.01, 0.1, 0.05, 0.03, 0.2, 0.02, 0.15, 0.25, 0.3, 0.05]
         self.reward_parameters = ["win", "loss", "draw", "move", "center_column", "adj_center_column", "2_one_side_open", "3_one_side_open",
                                   "block_2_one_side_open", "block_3_one_side_open", "create_fork", "opponent_fork", "vertical_stack"]
-        self.rewards_dict = dict(zip(self.reward_parameters, rewards))
+        self.rewards = dict(zip(self.reward_parameters, rewards))
 
     def get_moves(self, board):
         """
@@ -49,29 +49,29 @@ class Connect4QLearning(QLearningAI):
         opp_token = "X" if current_token == "O" else "O"
 
         if status == "won" and winning_token == current_token:
-            return self.rewards_dict["win"] # Winning Reward
+            return self.rewards["win"] # Winning Reward
         elif status == "won" and winning_token != current_token:
-            return self.rewards_dict["loss"] # Losing Reward
+            return self.rewards["loss"] # Losing Reward
         elif status == "draw":
-            return self.rewards_dict["draw"]
+            return self.rewards["draw"]
         else:
-            r = self.rewards_dict["move"]
+            r = self.rewards["move"]
 
-            if move[0] == 3: r += self.rewards_dict["center_column"]
-            elif move[0] == 4 or move[0] == 2: r += self.rewards_dict["adj_center_column"]
+            if move[0] == 3: r += self.rewards["center_column"]
+            elif move[0] == 4 or move[0] == 2: r += self.rewards["adj_center_column"]
 
             prev_own_2_open_both_sides, prev_own_3_open_one_sides, prev_opp_2_open_both_sides, prev_opp_3_open_one_sides, prev_own_2_open_one_side, prev_opp_2_open_one_side = self.get_board_info(current_board, current_token, opp_token)
             after_own_2_open_both_sides, after_own_3_open_one_sides, after_opp_2_open_both_sides, after_opp_3_open_one_sides, after_own_2_open_one_side, after_opp_2_open_one_side = self.get_board_info(next_board, current_token, opp_token)
 
-            r += self.rewards_dict["2_one_side_open"] * max(0, after_own_2_open_one_side - prev_own_2_open_one_side)
-            r += self.rewards_dict["block_2_one_side_open"] * max(0, after_opp_2_open_one_side - prev_opp_2_open_one_side)
-            r += self.rewards_dict["create_fork"] * max(0, after_own_2_open_both_sides - prev_own_2_open_both_sides)
-            r += self.rewards_dict["3_one_side_open"] * max(0, after_own_3_open_one_sides - prev_own_3_open_one_sides)
-            r += self.rewards_dict["opponent_fork"] * max(0, after_opp_2_open_both_sides - prev_opp_2_open_both_sides)
-            r += self.rewards_dict["block_3_one_side_open"] * max(0, after_opp_3_open_one_sides - prev_opp_3_open_one_sides)
+            r += self.rewards["2_one_side_open"] * max(0, after_own_2_open_one_side - prev_own_2_open_one_side)
+            r += self.rewards["block_2_one_side_open"] * max(0, after_opp_2_open_one_side - prev_opp_2_open_one_side)
+            r += self.rewards["create_fork"] * max(0, after_own_2_open_both_sides - prev_own_2_open_both_sides)
+            r += self.rewards["3_one_side_open"] * max(0, after_own_3_open_one_sides - prev_own_3_open_one_sides)
+            r += self.rewards["opponent_fork"] * max(0, after_opp_2_open_both_sides - prev_opp_2_open_both_sides)
+            r += self.rewards["block_3_one_side_open"] * max(0, after_opp_3_open_one_sides - prev_opp_3_open_one_sides)
 
             if vertical_stack_flag:
-                r += self.rewards_dict["vertical_stack"]
+                r += self.rewards["vertical_stack"]
 
             return r
 
