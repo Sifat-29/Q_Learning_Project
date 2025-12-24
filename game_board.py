@@ -1,178 +1,105 @@
 from .Minimax import MinimaxTictactoe
 from .Q_Learning_AI import QLearningAI
-# from Q_Learning_AI_Tictactoe import TictactoeQLearning
-# from Q_Learning_AI_Connect4 import Connect4QLearning
-from abc import ABC,abstractmethod
+from abc import ABC, abstractmethod
+from typing import Tuple, List, Union, Optional, Dict
 import random
 import copy
-#=======================================================================================================================
-#=================================== Game Board Class ==================================================================
-#=======================================================================================================================
+
 class GameBoard(ABC):
     """
-    Player1 always moves first
+    Abstract Base Class for Game Boards.
+    Manages the game loop, player turns, and evaluation logic.
     """
-    def __init__(self, player1 = "human1", player2 = "human2"):
+    def __init__(self, player1: Union[str, QLearningAI, MinimaxTictactoe] = "human1", 
+                 player2: Union[str, QLearningAI, MinimaxTictactoe] = "human2"):
 
-        # Handling both type of the players
-        if isinstance(player1, (str, QLearningAI, MinimaxTictactoe)):
-            self.player1 = player1
-        else:
-            print("Invalid player1, Assigning Human")
-            self.player1 = "human1"
+        self.player1 = player1 if isinstance(player1, (str, QLearningAI, MinimaxTictactoe)) else "human1"
+        self.player2 = player2 if isinstance(player2, (str, QLearningAI, MinimaxTictactoe)) else "human2"
 
-        if isinstance(player2, (str, QLearningAI, MinimaxTictactoe)):
-            self.player2 = player2
-        else:
-            print("Invalid player2, Assigning Human")
-            self.player2 = "human2"
-
-        # Keeping track of the game winner ("won": player(object), "draw": 0, "not over": None) and moves played
-        self.winner = None
-        self.moves_played = 0
-
-        # Board depending upon the game being played
+        self.winner: Optional[Union[str, QLearningAI, MinimaxTictactoe, int]] = None
+        self.moves_played: int = 0
         self.board = self.get_empty_board()
 
-
     @abstractmethod
-    def get_empty_board(self):
+    def get_empty_board(self) -> List[List[str]]:
         pass
 
     @abstractmethod
-    def get_pretty_printing_board(self, board):
+    def get_pretty_printing_board(self, board: List[List[str]]) -> str:
         pass
 
-
-    def start_game(self, mode="play", test=False, epsilon=0.1, alpha=0.2, gamma=0.9):
+    def start_game(self, mode: str = "play", verbose: bool = True, epsilon: float = 0.1, 
+                   alpha: float = 0.2, gamma: float = 0.9) -> Dict[str, any]:
         """
-        Plays the game based on the type of players (Independent of the game type)
+        Executes the game loop. 
+        Returns a summary of the game outcome.
         """
-        if not test: print(f"================= Game of {self.game} started between {self.player1} & {self.player2} =================\n")
+        if verbose: 
+            print(f"--- {self.game} match: {self.player1} vs {self.player2} ---")
 
-        if mode == "play": # Simply plays the game instead of training
-            while self.winner is None:
-                player, other_player, token, token_ = self.get_round_info()
+        while self.winner is None:
+            player, other_player, token, _ = self.get_round_info()
 
-                if not test:
-                    print(f"Current Board:")
+            if mode == "play":
+                if verbose:
                     print(self.get_pretty_printing_board(self.board))
-                    print(f"\n\nCurrent player is {player}")
-
-                if isinstance(player, str):
-                    move = self.make_move(self.board, player, token)
-                else:
-                    move = self.make_move(tuple((tuple(x) for x in self.board)), player, token)
+                
+                state_representation = tuple(tuple(row) for row in self.board) if not isinstance(player, str) else self.board
+                move = self.make_move(state_representation, player, token)
                 self.place_token_on_board(self.board, token, move)
                 self.moves_played += 1
-                game_status, winning_token = self.is_game_over(self.board, move, check="special")
-
-                if game_status == "won":
-                    if not test:
-                        print(self.get_pretty_printing_board(self.board))
-                        print(f"{player} Won Against {other_player}!!!")
+                
+                status, winning_token = self.is_game_over(self.board, move, check="special")
+                if status == "won":
                     self.winner = player
-
-                elif game_status == "draw":
-                    if not test:
-                        print(self.get_pretty_printing_board(self.board))
-                        print(f"{player} Drew Against {other_player}")
+                elif status == "draw":
                     self.winner = 0
 
-                if not test: print("==============================================================================================")
-
-        elif mode == "train":
-            if isinstance(self.player1, str) or isinstance(self.player2, str):
-                print("Only AI are allowed to train")
-                return
-
-            while self.winner is None:
-                player, other_player, token, token_ = self.get_round_info()
-                current_board = tuple((tuple(row) for row in self.board))
-
-                # Board after move
+            elif mode == "train":
+                current_board = tuple(tuple(row) for row in self.board)
                 move = self.make_move(current_board, player, token, epsilon=epsilon)
                 self.place_token_on_board(self.board, token, move)
-                next_board = tuple((tuple(row) for row in self.board))
-
+                next_board = tuple(tuple(row) for row in self.board)
                 self.moves_played += 1
 
                 status, winning_token = self.is_game_over(next_board, move, check="board")
 
                 if isinstance(player, QLearningAI):
                     reward = player.get_reward_for_move(status, winning_token, token, current_board, move, next_board)
+                    # Perspective shift for zero-sum logic
                     reward = -reward if token == "O" else reward
-
-                if status == "won" and winning_token == token:
-                    self.winner = player
-                elif status == "won" and winning_token != token:
-                    self.winner = other_player
-                elif status == "draw":
-                    self.winner = 0
-
-                if isinstance(player, QLearningAI):
                     if not player.is_ai_random():
                         player.update_memory(current_board, tuple(move), next_board, reward, alpha, gamma, token)
 
+                if status == "won":
+                    self.winner = player if winning_token == token else other_player
+                elif status == "draw":
+                    self.winner = 0
 
-    def get_round_info(self):
-        """
-        Returns current_player, other_player, current_token, other_token
-        """
+        return {"winner": self.winner, "moves": self.moves_played}
+
+    def get_round_info(self) -> Tuple[any, any, str, str]:
         if self.moves_played % 2 == 0:
             return self.player1, self.player2, "X", "O"
-        else:
-            return self.player2, self.player1, "O", "X"
+        return self.player2, self.player1, "O", "X"
 
-
-    def make_move(self, board, player, token, epsilon=0):
-        """
-        Make the move for each game board after receiving the input move (move is different for each game)
-        TicTacToe: move is (i, j) list/tuple
-        Connect4: move is an (i) list/tuple
-        Othello: move is an (i, j) list/tuple
-        Chess: Haven't figured out yet
-        TODO: Othello (P1), Chess (P2)
-        """
+    def make_move(self, board: Union[List, Tuple], player: any, token: str, epsilon: float = 0) -> List[int]:
         if isinstance(player, str):
             return self.get_move_from_player()
-
         elif isinstance(player, QLearningAI):
             return list(player.select_move(board, token, epsilon))
-
         elif isinstance(player, MinimaxTictactoe):
             return player.get_optimal_move(board, token)
-
-        else:
-            print("Invalid player")
-            return None
-
+        return []
 
     @abstractmethod
-    def get_move_from_player(self):
-        """
-        Get a valid move from player depending upon the game type
-        TicTacToe: move is (i, j) list
-        Connect4: move is a (i) list
-        Othello: move is an (i, j) list
-        Chess: Haven't figured out yet
-        TODO: Chess (P2)
-        """
+    def get_move_from_player(self) -> List[int]:
         pass
 
     @abstractmethod
-    def place_token_on_board(self, board, token, move):
+    def place_token_on_board(self, board: List[List[str]], token: str, move: List[int]):
         pass
 
     @abstractmethod
-    def is_game_over(self, board, move,check="special"):
-        """
-        Check whether the game is over
-        returns "won" if the game is over and won
-        returns "draw" if the game is over and draw
-        returns "not over" if the game is not over
-        TODO othello(P1), chess(P2)
-        """
+    def is_game_over(self, board: List[List[str]], move: List[int], check: str = "special") -> Tuple[str, str]:
         pass
-
-
